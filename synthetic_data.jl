@@ -4,7 +4,7 @@ Pkg.activate(".")
 
 using StochasticAD, Random, Distributions, Optimisers, CairoMakie, LinearAlgebra
 
-Random.seed!(413)
+Random.seed!(123)
 
 # number of sites
 n = 25
@@ -15,8 +15,6 @@ K = [4 for i in 1:n]
 # covariates 
 x_dst = Uniform(-2,2)
 w_dst = Uniform(-5,5)
-#X = [(rand(x_dst, 2) .- mean(x_dst)) ./ std(x_dst) for i in 1:n]
-#W = [[(rand(w_dst, 2) .- mean(w_dst)) ./ std(w_dst) for j in 1:K[i]] for i in eachindex(K)]
 X = [vcat((rand(x_dst, 1) .- mean(x_dst)) ./ std(x_dst),1) for i in 1:n]
 W = [[vcat((rand(w_dst, 1) .- mean(w_dst)) ./ std(w_dst),1) for j in 1:K[i]] for i in eachindex(K)]
 
@@ -33,8 +31,8 @@ d(w,α) = 0.001 + 0.999/(1+exp(-α'*w)) # observation probability
 α_true = [1.35,1.75]#[0, 1.75]
 β_true = [-0.1,2.5]#[-1.85, 2.5]
 z_latent = [rand(Bernoulli(ψ(X[i], β_true))) for i in 1:n]
-y_observed = [[rand(Bernoulli(z_latent[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n]
-z_known = [!all(y_observed[i] .== 0) for i in 1:n]
+Y = [[rand(Bernoulli(z_latent[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n]
+z_known = [!all(Y[i] .== 0) for i in 1:n]
 
 function conditional(y,z,αβ;W=W,X=X)
     p = 1.0
@@ -55,6 +53,7 @@ function logjoint(y,z,αβ,logprior;W=W,X=X)
     @views α, β = αβ[1:2], αβ[3:4]
     for i in eachindex(X)
         if z_known[i]    
+            logp += log(ψ(X[i],β))
             for j in eachindex(W[i])
                 logp += log((d(W[i][j], α))^y[i][j]*(1-d(W[i][j], α))^(1-y[i][j])) 
             end
@@ -72,6 +71,7 @@ function logmarginal(y,z_known,αβ; W=W, X=X)
     @views α, β = αβ[1:2], αβ[3:4]
     for i in eachindex(X)
         if z_known[i]    
+            logp += log(ψ(X[i],β))
             for j in eachindex(W[i])
                 logp += log((d(W[i][j], α))^y[i][j]*(1-d(W[i][j], α))^(1-y[i][j])) 
             end
@@ -96,7 +96,7 @@ function q(ϕ,z,αβ; z_known=z_known)
     #Σinv = Distributions.PDMat(V*V')
     #q_αβ = MvNormalCanon(μ, Σinv*μ, Σinv)
     q_αβ = MvNormal(μ, V*V' + 0.01*I)
-    ps = [z_known[i] == 1 ? 1 : 1/2*(1+0.95*tanh(ϕ[20+i])) for i in eachindex(X)]
+    ps = [z_known[i] == 1 ? 1 : 1/2*(1+0.99*tanh(ϕ[20+i])) for i in eachindex(X)]
     return pdf(q_αβ, αβ)*prod((ps .^ z) .* ((1 .- ps) .^ (1 .- z)))
 end
 function logq(ϕ,z,αβ; z_known=z_known)
@@ -115,19 +115,20 @@ function sample_q(ϕ; X=X, W=W, z_known=z_known)
     V = reshape(ϕ[5:20], 4, 4)
     #Σinv = Distributions.PDMat(V*V')
     #q_αβ = MvNormalCanon(μ, Σinv*μ, Σinv)
-    ps = [z_known[i] == 1 ? 1 : 1/2*(1+tanh(ϕ[20+i])) for i in eachindex(X)]
-    q_αβ = MvNormal(μ, V*V' + 0.01*I) 
+    ps = [z_known[i] == 1 ? 1.0 : 1/2*(1+tanh(ϕ[20+i])) for i in eachindex(X)]
+
+    q_αβ = MvNormal(μ, Hermitian(V*V' + 0.01*I))
     αβ = rand(q_αβ)
     @views α, β = αβ[1:2], αβ[3:4]
     q_z = Bernoulli.(ps) 
     return [z_known[i] == 1 ? 1 : rand(q_z[i]) for i in eachindex(q_z)], αβ
 end
 
-function div(ϕ, z, αβ; y=y_observed, prior=prior, logprior=logprior, W=W, X=X)
+function div(ϕ, z, αβ; y=Y, prior=prior, logprior=logprior, W=W, X=X)
     return logjoint(y, z, αβ, logprior, W=W, X=X) - logq(ϕ,z,αβ)
 end
 
-function elbo_estimator(ϕ; n=1, y=y_observed, prior=prior, W=W, X=X)
+function elbo_estimator(ϕ; n=1, y=Y, prior=prior, W=W, X=X)
     elbo = 0.0
     for _ in 1:n
         z, αβ = sample_q(ϕ)
@@ -136,26 +137,35 @@ function elbo_estimator(ϕ; n=1, y=y_observed, prior=prior, W=W, X=X)
     return elbo/n
 end
 
-function optimize_elbo(batch_size, iterations, LEARNING_RATE; n_estimator = batch_size)
+function optimize_elbo(batch_size, iterations, LEARNING_RATE; n_estimator = batch_size, n_snapshots = 1)
     ϕ0 = randn(n+20)
     obj = StochasticModel(ϕ -> -elbo_estimator(ϕ, n= batch_size), ϕ0)
     elbo_trace = Float64[]
+    wall_times = Float64[]
+    ϕ_trace = Vector{Float64}[]
     optimizer = Adam(LEARNING_RATE)
     setup = Optimisers.setup(optimizer, obj)
+    t = 0
+    elbo = elbo_estimator(obj.p, n=n_estimator)
+    push!(elbo_trace, elbo)
+    push!(wall_times, t)
     for i in 1:iterations
-        grad = stochastic_gradient(obj)
+        t += @elapsed grad = stochastic_gradient(obj)
         if sum(isinf.(grad.p)) == 0
-            Optimisers.update!(setup, obj, grad)
+            t += @elapsed Optimisers.update!(setup, obj, grad)
+            push!(ϕ_trace, deepcopy(obj.p))
+            println("iteration $i")
+        end
+        if i % n_snapshots == 0
             elbo = elbo_estimator(obj.p, n=n_estimator)
-            println("iteration $i -- ELBO = $elbo")
             push!(elbo_trace, elbo)
-        else
-            elbo = elbo_estimator(obj.p, n=n_estimator)
-            println("iteration $i -- ELBO = $elbo")
-            push!(elbo_trace, elbo)
+            push!(wall_times, t)
         end
     end
-    return elbo_trace, obj.p
+    elbo = elbo_estimator(obj.p, n=n_estimator)
+    push!(elbo_trace, elbo)
+    push!(wall_times, t)
+    return obj.p, ϕ_trace, wall_times, elbo_trace
 end
 
 function plot_opt_trajectories(batch_sizes, traces)
@@ -201,7 +211,7 @@ function plot_gaussian(Σ, μ, width)
     return X,Y,Z
 end
 
-function plot_results(chain, ϕ, true_pars; burnin = 1000, width = 5, thinning = 1000)
+function plot_results(chain, ϕ, true_pars; burnin = 5000, width = 5, thinning = 1000)
     μ, V = ϕ[1:4], reshape(ϕ[5:20],4,4)
     Σ = V*V' + 0.01*I
     symbols = [Symbol("αβ[$i]") for i in 1:4]
@@ -246,16 +256,98 @@ function plot_results(chain, ϕ, true_pars; burnin = 1000, width = 5, thinning =
     fig
 end
 
-opt_trace, ϕ_opt = optimize_elbo(2, 1000, 0.05)
+# plot a movie 
+function plot_results_movie(chain, ϕ_trace, true_pars; filename = "VI_movie.mp4", burnin = 5000, width = 5, thinning = 1000)
+    ϕ = ϕ_trace[end]
+    obs = Dict()
+
+    μ, V = ϕ[1:4], reshape(ϕ[5:20],4,4)
+    Σ = V*V' + 0.01*I
+    symbols = [Symbol("αβ[$i]") for i in 1:4]
+    vars = [L"\alpha_1", L"\alpha_2", L"\beta_1", L"\beta_2"]
+    chain_mean = [mean(chain[par][burnin:end]) for par in symbols]
+
+    fig = Figure(fontsize=28, resolution = (1000,1000))
+
+    axs = [[Axis(fig[i,j-1], xlabel = vars[j], ylabel=vars[i]) for j in i+1:4] for i in 1:3]
+    burnin = 25000
+    for i in 1:3
+        k = 0
+        for j in i+1:4
+            k += 1
+            scatter!(axs[i][k], chain[symbols[j]][burnin:end].data[1:thinning:end], 
+                                chain[symbols[i]][burnin:end].data[1:thinning:end], 
+                                color = (:black,0.2))
+            scatter!(axs[i][k], [chain_mean[j]], [chain_mean[i]], 
+                                color = :yellow, marker = :cross)
+            scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :star8, color = :blue)
+
+            X, Y, Z = plot_gaussian(Σ[[j,i],[j,i]], μ[[j,i]], width)
+            obs[i,j] = Observable(X), Observable(Y), Observable(-Z), Observable(Point2(μ[j], μ[i]))
+                                
+            global cf = contour!(axs[i][k], obs[i,j][1], obs[i,j][2], obs[i,j][3], linewidth = 2, 
+                                 colorrange = (-width, 0), 
+                                 colormap=:OrRd, levels= -width:1:-1)
+            
+            scatter!(axs[i][k], obs[i,j][4], marker = :circle, color = :red)
+        end
+    end
+    legends = [[MarkerElement(marker=:circle, color = :red),
+                MarkerElement(marker=:cross, color = :yellow),
+                MarkerElement(marker=:star8, color = :blue),
+                MarkerElement(marker=:circle, color = (:black, 0.2))]]
+    labels = [[L"\text{VI mean}", 
+              L"\text{HMC mean}", 
+              L"\text{True value}",
+              L"\text{HMC samples}"]]
+    ga = fig[2:3, 1] = GridLayout()
+    Legend(ga[1,1], legends, labels, ["Legend"])
+    Colorbar(ga[2,1], cf, #ticks=(collect(-width:1:0), ["$i" for i in abs.(-width:1:0)]),
+                      label = L"\propto \log \, q", width=30)
+    Label(ga[2,1,Top()], "Variational Distribution", font = :bold, padding = (0, 0, 10, 0))
+    it_label = Observable(1)
+    #gb = fig[3, 2] = GridLayout()
+    #it = lift(i -> string("Iteration = ", it_label.val), 1)
+    #Label(gb[1,1], it)#, font = :bold)
+    
+    record(fig, "../figures/"*filename, enumerate(ϕ_trace)) do (iter,ϕ)
+        μ, V = ϕ[1:4], reshape(ϕ[5:20],4,4)
+        Σ = V*V' + 0.01*I
+        for i in 1:3
+            for j in i+1:4
+                X, Y, Z = plot_gaussian(Σ[[j,i],[j,i]], μ[[j,i]], width)
+                obs[i,j][1][] = X
+                obs[i,j][2][] = Y
+                obs[i,j][3][] = -Z
+                obs[i,j][4][] = Point2(μ[j], μ[i])
+            end
+        end
+        #it_label[] = iter
+        #it_label = it_label[]
+    end
+end
+
+# get a trajectory
+# compare VI trajectories
+# batch size = 1
+ϕ_opt, ϕ_trace, times, elbo_trace = optimize_elbo(1, 500, 0.05, n_snapshots=1000, n_estimator = 1000)
 fig = plot_results(chain, ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
 save("../figures/progress_report.pdf",fig)
+plot_results_movie(chain, ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_1.mp4", thinning = 100)
 
+# batch size = 10
+ϕ_opt, ϕ_trace, times, elbo_trace = optimize_elbo(10, 500, 0.05, n_snapshots=1000, n_estimator = 1000)
+fig = plot_results(chain, ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
+save("../figures/progress_report.pdf",fig)
+plot_results_movie(chain, ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_10.mp4", thinning = 100)
+
+# plot convergence
 batch_sizes = [1, 10, 50]
 n_iterations = 100
 step_size = 0.05
 n_sample = [2000, 200, 10]
 
-#results = Dict()
+results = Dict()
 for (i,batch_size) in enumerate(batch_sizes)
     sample_traces = zeros(0, n_iterations)
     for n in 1:n_sample[i]
