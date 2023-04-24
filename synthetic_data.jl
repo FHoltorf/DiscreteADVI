@@ -7,7 +7,7 @@ using StochasticAD, Random, Distributions, Optimisers, CairoMakie, LinearAlgebra
 Random.seed!(123)
 
 # number of sites
-n = 5
+n = 20
 
 # number of visits per site
 K = [4 for i in 1:n]
@@ -34,7 +34,7 @@ z_latent = [rand(Bernoulli(ψ(X[i], β_true))) for i in 1:n]
 Y = [[rand(Bernoulli(z_latent[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n]
 z_known = [!all(Y[i] .== 0) for i in 1:n]
 
-function conditional(y,z,αβ;W=W,X=X)
+function likelihood(y,z,αβ;W=W,X=X)
     p = 1.0
     @views α, β = αβ[1:2], αβ[3:4]
     for i in eachindex(X)
@@ -45,7 +45,7 @@ function conditional(y,z,αβ;W=W,X=X)
     end
     return p 
 end
-function logconditional(y,z,αβ;W=W,X=X)
+function loglikelihood(y,z,αβ;W=W,X=X)
     logp = 0.0
     @views α, β = αβ[1:2], αβ[3:4]
     for i in eachindex(X)
@@ -57,7 +57,7 @@ function logconditional(y,z,αβ;W=W,X=X)
     return logp 
 end
 function joint(y,z,αβ,prior;W=W, X=X)
-    return conditional(y,z,αβ;W=W,X=X)*prior(αβ)
+    return likelihood(y,z,αβ;W=W,X=X)*prior(αβ)
 end
 function logjoint(y,z,αβ,logprior;W=W,X=X)
     logp = 0.0
@@ -152,7 +152,7 @@ function predictive_posterior_estimator(ϕ; n=1, y=Y, W=W, X=X)
     log_predictive = 0.0
     for _ in 1:n
         z, αβ = sample_q(ϕ)
-        log_predictive += logconditional(y, z, αβ, W=W, X=X)
+        log_predictive += loglikelihood(y, z, αβ, W=W, X=X)
     end
     return log_predictive/n
 end
@@ -338,11 +338,11 @@ end
 include("turing_model.jl")
 
 n_chain = 100000
-sampler = NUTS(50,0.65) # HMC(0.05, 1000) 
-chain = sample(occupancy(Y), sampler, n_chain, drop_warmup=false)
+sampler = NUTS() # HMC(0.05, 1000) 
+t_NUTS = @elapsed chain = sample(occupancy(Y), sampler, n_chain, drop_warmup=false)
 #MCMC_log_predictive_trace = cumsum(chain[:log_density][:,1]) ./ (1:length(chain[:log_density]))
 MCMC_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain[chain.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain[:log_density]))
-MCMC_times = range(0.0, chain.info[2]-chain.info[1], length=length(MCMC_log_predictive_trace))
+MCMC_times = range(0.0, t_NUTS, length=length(MCMC_log_predictive_trace))
 
 # p(theta|Y) p(Y) = p(Y, theta) = p(Y|theta) p(theta)
 # P(Y) = p(Y|theta) * p(theta)/p(theta|Y) 
@@ -373,6 +373,16 @@ for n in n_batches
     ϕ_opt, ϕ_trace, times, elbo_trace, log_pred_trace = optimize_elbo(n, 200, 0.05, n_snapshots=5, n_estimator = 1000)
     results[n] = (ϕ_trace, times, elbo_trace, log_pred_trace)
 end
+
+fig = Figure(fontsize=28)
+ax = Axis(fig[1,1],xlabel=L"\text{time [s]}",ylabel=L"\text{log predictive posterior}", xscale=log10)
+ylims!(ax, -100, 0)
+for n in n_batches
+    lines!(ax, results[n][2][2:end], results[n][4], label = "m = $n", linewidth=3)
+end
+lines!(ax, MCMC_times[2:end], MCMC_log_predictive_trace[2:end], label = "NUTS", linewidth=3)
+axislegend()
+fig
 
 
 # compare convergence in terms of log posterior predictive
