@@ -16,8 +16,7 @@ function predictive_posterior_estimator(ϕ; n=1, y=Y, W=W, X=X)
     return log_predictive/n
 end
 
-function optimize_elbo(batch_size, iterations, LEARNING_RATE; n_estimator = batch_size, n_snapshots = 1)
-    ϕ0 = randn(n+20)
+function optimize_elbo(ϕ0, batch_size, iterations, LEARNING_RATE; n_estimator = batch_size, n_snapshots = 1)
     obj = StochasticModel(ϕ -> -elbo_estimator(ϕ, n= batch_size), ϕ0)
     elbo_trace = Float64[]
     log_predictive_trace = Float64[]

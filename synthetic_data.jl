@@ -34,14 +34,16 @@ MCMC_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in 
 MCMC_times = range(0.0, t_NUTS, length=length(MCMC_log_predictive_trace))
 
 # compare VI trajectories
+ϕ0 = randn(20+n)
+
 # batch size = 10
-ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(10, 500, 0.05, n_snapshots=1000, n_estimator = 1000)
+ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(ϕ0, 10, 500, 0.05, n_snapshots=1000, n_estimator = 1000)
 fig = pairplot(chain, ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
 save("../figures/progress_report.pdf",fig)
 pairplot_movie(chain, ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_10.mp4", thinning = 100)
 
 # batch size = 1
-ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(1, 500, 0.05, n_snapshots=10, n_estimator = 1000)
+ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(ϕ0, 1, 500, 0.05, n_snapshots=10, n_estimator = 1000)
 fig = pairplot(chain, ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
 save("../figures/progress_report.pdf",fig)
 pairplot_movie(chain, ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_1.mp4", thinning = 100)
