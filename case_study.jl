@@ -179,7 +179,7 @@ for spec in specs
 
     n_chain = 500000
     sampler = NUTS(1000, 0.65)
-    chain = sample(occupancy(αβ_prior,Y,z_known,W,X), sampler, n_chain, drop_warmup=true)
+    chain = sample(marginal_occupancy(αβ_prior,Y,z_known,W,X), sampler, n_chain, drop_warmup=true)
 
     function plot_chain(chain; burnin = 1000)
         fig = Figure(fontsize=28)

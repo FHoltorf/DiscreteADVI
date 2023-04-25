@@ -121,7 +121,16 @@ function div(ϕ, z, αβ; y=Y, prior=prior, logprior=logprior, W=W, X=X)
     return logjoint(y, z, αβ, logprior, W=W, X=X) - logq(ϕ,z,αβ)
 end
 
-@model function occupancy(Y;z_known = z_known, prior = αβ_prior, W=W, X=X)
+@model function marginal_occupancy(Y;z_known = z_known, prior = αβ_prior, W=W, X=X)
     αβ ~ prior
     Turing.@addlogprob! logmarginal(Y,z_known,αβ,W=W,X=X)
+end    
+
+@model function occupancy(Y;z_known = z_known, prior = αβ_prior, W=W, X=X)
+    αβ ~ prior
+    β = αβ[3:4]
+    for i in eachindex(X[i])
+        z[i] ~ Bernoulli(z_known[i] ? 1 : ψ(X[i],β))
+    end
+    Turing.@addlogprob! loglikelihood(Y,z_known,αβ,W=W,X=X)
 end    

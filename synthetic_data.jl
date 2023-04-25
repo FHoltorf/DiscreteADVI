@@ -29,7 +29,7 @@ z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are 
 # evaluation
 n_chain = 100000
 sampler = NUTS() # HMC(0.05, 1000) 
-t_NUTS = @elapsed chain = sample(occupancy(Y), sampler, n_chain, drop_warmup=false)
+t_NUTS = @elapsed chain = sample(marginal_occupancy(Y), sampler, n_chain, drop_warmup=false)
 NUTS_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain[chain.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain[:log_density]))
 NUTS_times = range(0.0, t_NUTS, length=length(NUTS_log_predictive_trace))
 
