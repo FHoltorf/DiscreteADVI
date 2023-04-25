@@ -30,20 +30,39 @@ z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are 
 n_chain = 100000
 sampler = NUTS() # HMC(0.05, 1000) 
 t_NUTS = @elapsed chain = sample(occupancy(Y), sampler, n_chain, drop_warmup=false)
-MCMC_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain[chain.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain[:log_density]))
-MCMC_times = range(0.0, t_NUTS, length=length(MCMC_log_predictive_trace))
+NUTS_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain[chain.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain[:log_density]))
+NUTS_times = range(0.0, t_NUTS, length=length(NUTS_log_predictive_trace))
 
 # compare VI trajectories
 ϕ0 = randn(20+n)
 
+struct OptResults
+    ϕ_opt
+    ϕ_trace
+    times
+    elbo_trace
+    log_predictive_trace
+end
 # batch size = 10
-ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(ϕ0, 10, 500, 0.05, n_snapshots=1000, n_estimator = 1000)
-fig = pairplot(chain, ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
-save("../figures/progress_report.pdf",fig)
-pairplot_movie(chain, ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_10.mp4", thinning = 100)
+res10 = OptResults(optimize_elbo(deepcopy(ϕ0), 10, 500, 0.05, n_snapshots=10, n_estimator = 1000)...)
+fig = pairplot(chain, res10.ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
+save("../figures/VI_synthetic_10.pdf",fig)
+pairplot_movie(chain, res10.ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_10.mp4", thinning = 100)
 
 # batch size = 1
-ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(ϕ0, 1, 500, 0.05, n_snapshots=10, n_estimator = 1000)
-fig = pairplot(chain, ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
-save("../figures/progress_report.pdf",fig)
-pairplot_movie(chain, ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_1.mp4", thinning = 100)
+res1 = OptResults(optimize_elbo(deepcopy(ϕ0), 1, 500, 0.05, n_snapshots=10, n_estimator = 1000)...)
+fig = pairplot(chain, res1.ϕ_opt, burnin=25000, vcat(α_true, β_true), thinning = 100)
+save("../figures/VI_synthetic_1.pdf",fig)
+pairplot_movie(chain, res1.ϕ_trace, burnin=25000, vcat(α_true, β_true), filename = "VI_movie_1.mp4", thinning = 100)
+
+# compare posterior predictive
+fig = Figure(fontsize=28)
+ax = Axis(fig[1,1], xlabel = "time [s]", 
+                    xminorgridvisible = true,
+                    xminorticks = IntervalsBetween(8),
+                    ylabel = "log predictive posterior",
+                    xscale = log10)
+lines!(ax, NUTS_times[2:end], NUTS_log_predictive_trace[2:end], color = :black, linewidth = 2)
+lines!(ax, res1.times[2:end], res1.log_predictive_trace, color = :red, linewidth=2)
+lines!(ax, res10.times[2:end], res10.log_predictive_trace, color = :blue, linewidth=2)
+fig
