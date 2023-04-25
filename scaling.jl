@@ -2,8 +2,11 @@ include("model.jl") # model specifications
 include("utils.jl") # optimization routines
 include("visualizations.jl") # plotting routines
 
+using FileIO
+
 # number of sites
-n_range = [5^i for i in 1:4]
+n_range = [5^i for i in 1:5]
+n_batches = [1]
 
 results = Dict()
 # number of visits per site
@@ -28,22 +31,33 @@ for n in n_range
     Y = [[rand(Bernoulli(Z[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n] # observations
     z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are known with certainty
 
-    results = Dict()
-    n_batches = [1,5,10,20]
     ϕ0 = randn(n+20)
     for n_batch in n_batches
         ϕ_opt, ϕ_trace, times, elbo_trace, log_pred_trace = optimize_elbo(ϕ0, n_batch, 200, 0.05, n_snapshots=5, n_estimator = 1000)
-        results[n_batch] = (ϕ_trace, times, elbo_trace, log_pred_trace)
+        results[n, n_batch] = (ϕ_trace, times, elbo_trace, log_pred_trace)
     end
 end
 
+# save results since expensive to compute
+save("results/scaling_results.jld", "results", results)
 
 fig = Figure(fontsize=28)
-ax = Axis(fig[1,1],xlabel=L"\text{time [s]}",ylabel=L"\text{log predictive posterior}", xscale=log10)
-ylims!(ax, -100, 0)
-for n in n_batches
-    lines!(ax, results[n][2][2:end], results[n][4], label = "m = $n", linewidth=3)
-end
-lines!(ax, MCMC_times[2:end], MCMC_log_predictive_trace[2:end], label = "NUTS", linewidth=3)
-axislegend()
-fig 
+ax = Axis(fig[1,1],
+          ylabel = "wall clock time [s]", 
+          xlabel = "Number of sites n",
+          xminorgridvisible = true,
+          yminorgridvisible = true,
+          xminorticks = IntervalsBetween(8),
+          yminorticks = IntervalsBetween(8),
+          xscale = log10,
+          yscale = log10)
+times = [results[n,1][2][end] for n in n_range]
+logtimes = log10.(times)
+logn = log10.(n_range)
+a = hcat(logn[2:end], ones(length(logn)-1))\logtimes[2:end]
+scatter!(ax, n_range, [results[n,1][2][end] for n in n_range], color = :black, markersize=20)
+lines!(ax, n_range[2:end], 10 .^ (hcat(logn[2:end], ones(length(logn)-1))*a), color = :black, linewidth=2)
+lines!(ax, [200,500], 10 .^ [[log10(200), 1]'*a, [log10(200), 1]'*a], linewidth=2, color = :red)
+lines!(ax, [500,500], 10 .^ [[log10(200), 1]'*a, [log10(500), 1]'*a], linewidth=2, color = :red)
+text!(ax, [550], [80], text=[string(round(a[1], digits=3))], fontsize=28)
+fig
