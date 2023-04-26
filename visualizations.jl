@@ -36,7 +36,6 @@ function pairplot(chain, ϕ, true_pars; burnin = 5000, width = 5, thinning = 100
     fig = Figure(fontsize=28, resolution = (1000,1000))
 
     axs = [[Axis(fig[i,j-1], xlabel = vars[j], ylabel=vars[i]) for j in i+1:4] for i in 1:3]
-    burnin = 25000
     for i in 1:3
         k = 0
         for j in i+1:4
