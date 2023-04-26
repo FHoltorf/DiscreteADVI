@@ -7,8 +7,8 @@ using StochasticAD, Random, Distributions, Optimisers, Turing, LinearAlgebra
 Random.seed!(123)
 
 # probabilistc model
-ψ(x,β) = 0.001 + 0.999/(1+exp(-β'*x)) # occupation probability
-d(w,α) = 0.001 + 0.999/(1+exp(-α'*w)) # observation probability
+ψ(x,β) = 0.0001 + 0.9999/(1+exp(-β'*x)) # occupation probability
+d(w,α) = 0.0001 + 0.9999/(1+exp(-α'*w)) # observation probability
 
 function likelihood(y,z,αβ;W=W,X=X)
     p = 1.0
