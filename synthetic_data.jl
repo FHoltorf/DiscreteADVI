@@ -28,7 +28,7 @@ z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are 
 
 # MCMC inference
 n_chain = 100000
-sampler = NUTS() # HMC(0.05, 1000) 
+sampler = NUTS() 
 t_NUTS = @elapsed chain_NUTS = sample(marginal_occupancy(Y), sampler, n_chain, drop_warmup=false)
 NUTS_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain_NUTS[chain_NUTS.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain_NUTS[:log_density]))
 NUTS_times = range(0.0, t_NUTS, length=length(NUTS_log_predictive_trace))
@@ -36,9 +36,7 @@ plot_chain(chain_NUTS, burnin=25000)
 
 sampler = Gibbs(HMC(0.05,1000,:αβ), PG(2, :z)) 
 t_Gibbs = @elapsed chain_Gibbs = sample(occupancy(Y), sampler, 20000, init_theta = vcat(zeros(4), ones(n-sum(z_known))))
-#Gibbs_loglikelihood = [isnan(loglikelihood(Y,pars[5:end],pars[1:4],W=W,X=X)) ? -1000 : loglikelihood(Y,pars[5:end],pars[1:4],W=W,X=X) for pars in eachrow(chain_Gibbs[chain_Gibbs.name_map[1]].value.data[:,:,1])]
 Gibbs_loglikelihood = [loglikelihood(Y,pars[5:end],pars[1:4],W=W,X=X) for pars in eachrow(chain_Gibbs[chain_Gibbs.name_map[1]].value.data[:,:,1])]
-sum(isnan.(Gibbs_loglikelihood))
 Gibbs_log_predictive_trace = cumsum(Gibbs_loglikelihood) ./ (1:length(Gibbs_loglikelihood))
 Gibbs_times = range(0.0, t_Gibbs, length=length(Gibbs_log_predictive_trace))
 plot_chain(chain_Gibbs, burnin=5000)
@@ -70,6 +68,7 @@ ax = Axis(fig[1,1], xlabel = "time [s]",
                     xminorgridvisible = true,
                     xminorticks = IntervalsBetween(8),
                     ylabel = "log predictive posterior",
+                    xticks = LogTicks(IntegerTicks()),
                     xscale = log10)
 ylims!(ax, -80, -30)
 lines!(ax, NUTS_times[2:end], NUTS_log_predictive_trace[2:end], color = :black, linewidth = 2, label = "NUTS + marginalization")
