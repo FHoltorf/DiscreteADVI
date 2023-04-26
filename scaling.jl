@@ -1,8 +1,8 @@
-include("model.jl") # model specifications 
+include("model_reduced.jl") # model specifications 
 include("utils.jl") # optimization routines
 include("visualizations.jl") # plotting routines
 
-using FileIO
+using FileIO, BenchmarkTools
 
 # number of sites
 n_range = [5^i for i in 1:5]
@@ -31,9 +31,9 @@ for n in n_range
     Y = [[rand(Bernoulli(Z[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n] # observations
     z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are known with certainty
 
-    ϕ0 = randn(n+20)
+    ϕ0 = randn(20+n-sum(z_known))
     for n_batch in n_batches
-        ϕ_opt, ϕ_trace, times, elbo_trace, log_pred_trace = optimize_elbo(ϕ0, n_batch, 200, 0.05, n_snapshots=5, n_estimator = 1000)
+        ϕ_opt, ϕ_trace, times, elbo_trace, log_pred_trace = optimize_elbo(deepcopy(ϕ0), n_batch, 200, 0.05, n_snapshots=5, n_estimator = 1000)
         results[n, n_batch] = (ϕ_trace, times, elbo_trace, log_pred_trace)
     end
 end
@@ -86,7 +86,7 @@ for n in n_range
     Y = [[rand(Bernoulli(Z[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n] # observations
     z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are known with certainty
 
-    ϕ0 = randn(n+20)
+    ϕ0 = randn(20+n-sum(z_known))
     
     obj = StochasticModel(ϕ -> -elbo_estimator(ϕ, n=1), ϕ0)
    
