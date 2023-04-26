@@ -1,5 +1,10 @@
 using CairoMakie
 
+struct IntegerTicks end
+
+Makie.get_tickvalues(::IntegerTicks, vmin, vmax) = ceil(Int, vmin) : floor(Int, vmax)
+
+
 function plot_chain(chain; burnin = 1000)
     fig = Figure(fontsize=28)
     ax_α = Axis(fig[1,1], xlabel = L"\alpha_1", ylabel=L"\alpha_2")
@@ -50,12 +55,12 @@ function pairplot(chain, ϕ, true_pars; burnin = 5000, width = 5, thinning = 100
             scatter!(axs[i][k], [chain_mean[j]], [chain_mean[i]], 
                                 color = :white, marker = :cross, strokecolor=:black, strokewidth=1, markersize=15)
             scatter!(axs[i][k], [μ[j]], [μ[i]], marker = :circle, color = :red, markersize=15)
-            scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :star4, color = :magenta, markersize=15)
+            scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :cross, color = :magenta, markersize=15)
         end
     end
     legends = [[MarkerElement(marker=:circle, color = :red, markersize=15),
                 MarkerElement(marker=:cross, color = :white, strokecolor=:black, strokewidth=1, markersize=15),
-                MarkerElement(marker=:star4, color = :magenta, markersize=15),
+                MarkerElement(marker=:cross, color = :magenta, markersize=15),
                 MarkerElement(marker=:circle, color = (:black, 0.2), markersize=15)]]
     labels = [[L"\text{VI mean}", 
               L"\text{HMC mean}", 
@@ -94,7 +99,7 @@ function pairplot_movie(chain, ϕ_trace, true_pars; filename = "VI_movie.mp4", b
                                 color = (:black,0.2))
             scatter!(axs[i][k], [chain_mean[j]], [chain_mean[i]], 
                                 color = :white, strokecolor=:black, strokewidth=1, marker = :cross, markersize=15)
-            scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :star4, color = :magenta, markersize=15)
+            scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :cross, color = :magenta, markersize=15)
 
             X, Y, Z = plot_gaussian(Σ[[j,i],[j,i]], μ[[j,i]], width)
             obs[i,j] = Observable(X), Observable(Y), Observable(-Z), Observable(Point2(μ[j], μ[i]))
@@ -108,7 +113,7 @@ function pairplot_movie(chain, ϕ_trace, true_pars; filename = "VI_movie.mp4", b
     end
     legends = [[MarkerElement(marker=:circle, color = :red, markersize=15),
                 MarkerElement(marker=:cross, color = :white, strokecolor=:black, strokewidth=1, markersize=15),
-                MarkerElement(marker=:star4, color = :magenta, markersize=15),
+                MarkerElement(marker=:cross, color = :magenta, markersize=15),
                 MarkerElement(marker=:circle, color = (:black, 0.2), markersize=15)]]
     labels = [[L"\text{VI mean}", 
               L"\text{HMC mean}", 
