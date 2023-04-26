@@ -4,7 +4,6 @@ struct IntegerTicks end
 
 Makie.get_tickvalues(::IntegerTicks, vmin, vmax) = ceil(Int, vmin) : floor(Int, vmax)
 
-
 function plot_chain(chain; burnin = 1000)
     fig = Figure(fontsize=28)
     ax_α = Axis(fig[1,1], xlabel = L"\alpha_1", ylabel=L"\alpha_2")
@@ -55,17 +54,28 @@ function pairplot(chain, ϕ, true_pars; burnin = 5000, width = 5, thinning = 100
             scatter!(axs[i][k], [chain_mean[j]], [chain_mean[i]], 
                                 color = :white, marker = :cross, strokecolor=:black, strokewidth=1, markersize=15)
             scatter!(axs[i][k], [μ[j]], [μ[i]], marker = :circle, color = :red, markersize=15)
-            scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :cross, color = :magenta, markersize=15)
+            if !isempty(true_pars)
+                scatter!(axs[i][k], [true_pars[j]], [true_pars[i]], marker = :cross, color = :magenta, markersize=15)
+            end
         end
     end
-    legends = [[MarkerElement(marker=:circle, color = :red, markersize=15),
-                MarkerElement(marker=:cross, color = :white, strokecolor=:black, strokewidth=1, markersize=15),
-                MarkerElement(marker=:cross, color = :magenta, markersize=15),
-                MarkerElement(marker=:circle, color = (:black, 0.2), markersize=15)]]
-    labels = [[L"\text{VI mean}", 
-              L"\text{HMC mean}", 
-              L"\text{True value}",
-              L"\text{HMC samples}"]]
+    if !isempty(true_pars)
+        legends = [[MarkerElement(marker=:circle, color = :red, markersize=15),
+                    MarkerElement(marker=:cross, color = :white, strokecolor=:black, strokewidth=1, markersize=15),
+                    MarkerElement(marker=:cross, color = :magenta, markersize=15),
+                    MarkerElement(marker=:circle, color = (:black, 0.2), markersize=15)]]
+        labels = [[L"\text{VI mean}", 
+                L"\text{HMC mean}", 
+                L"\text{True value}",
+                L"\text{HMC samples}"]]
+    else
+        legends = [[MarkerElement(marker=:circle, color = :red, markersize=15),
+                    MarkerElement(marker=:cross, color = :white, strokecolor=:black, strokewidth=1, markersize=15),
+                    MarkerElement(marker=:circle, color = (:black, 0.2), markersize=15)]]
+        labels = [[L"\text{VI mean}", 
+                L"\text{HMC mean}", 
+                L"\text{HMC samples}"]]
+    end
     ga = fig[2:3, 1] = GridLayout()
     Legend(ga[1,1], legends, labels, ["Legend"])
     Colorbar(ga[2,1], cf, #ticks=(collect(-width:1:0), ["$i" for i in abs.(-width:1:0)]),
@@ -146,6 +156,24 @@ function pairplot_movie(chain, ϕ_trace, true_pars; filename = "VI_movie.mp4", b
     end
 end
 
+function marginals(chain, ϕ; burnin = 1000, width = 4, opacity=0.1)
+    μ, V = ϕ[1:4], reshape(ϕ[5:20],4,4)
+    Σ = V*V' + 0.01*I
+    vars = [L"\alpha_1", L"\alpha_2", L"\beta_1", L"\beta_2"]
+    fig = Figure(fontsize=24, resolution = (1100,500))
+    axs = [Axis(fig[1,i], xminorgridvisible=false, xgridvisible=false,
+                          yminorgridvisible=false, ygridvisible=false,
+                          xlabel = vars[i]) for i in 1:4]
+    for i in 1:4
+        dist = Normal(μ[i], sqrt.(Σ[i,i]))
+        x_range = range(dist.μ-width*dist.σ, dist.μ+width*dist.σ, 100)
+        samples = chain.value[burnin:end, chain.value.axes[2][i]].data[:]
+        hist!(axs[i], samples, normalization=:pdf, strokcolor=:black, strokewidth=2, color=(:gray, opacity))
+        lines!(axs[i], x_range, pdf.(dist, x_range), color = :red, linewidth=2)
+    end
+    
+    fig
+end
 
 # plot convergence
 #=
