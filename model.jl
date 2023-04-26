@@ -128,9 +128,38 @@ end
 
 @model function occupancy(Y;z_known = z_known, prior = αβ_prior, W=W, X=X)
     αβ ~ prior
-    β = αβ[3:4]
-    for i in eachindex(X[i])
-        z[i] ~ Bernoulli(z_known[i] ? 1 : ψ(X[i],β))
+    
+    @views α = αβ[1:2]
+    @views β = αβ[3:4]
+    #=
+    z = fill(undef, length(Y))
+    for i in eachindex(X)
+        z[i] ~ Bernoulli(ψ(X[i],β))
+        for j in eachindex(W[i])
+            Y[i][j] ~  Bernoulli(z[i]*d(W[i][j],α))
+        end
     end
-    Turing.@addlogprob! loglikelihood(Y,z_known,αβ,W=W,X=X)
+    =#
+    z = fill(undef, length(z_known) - sum(z_known))
+    k = 1
+    for i in eachindex(X)
+        if z_known[i]
+            z_known[i] ~ Bernoulli(ψ(X[i],β))
+            for j in eachindex(W[i])
+                Y[i][j] ~ Bernoulli(d(W[i][j],α))
+            end
+        else
+            z[k] ~ Bernoulli(ψ(X[i],β))
+            for j in eachindex(W[i])
+                Y[i][j] ~ Bernoulli(z[k]*d(W[i][j],α))
+            end
+            k += 1
+        end
+    end
 end    
+
+function gibbs_sampler()
+    # draw latent
+
+    # draw alpha, beta
+end

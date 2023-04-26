@@ -27,11 +27,31 @@ Y = [[rand(Bernoulli(Z[i]*d(W[i][j], α_true))) for j in 1:K[i]] for i in 1:n] #
 z_known = [!all(Y[i] .== 0) for i in 1:n] # flag for which latent variables are known with certainty
 
 # evaluation
-n_chain = 100000
+n_chain = 1000
 sampler = NUTS() # HMC(0.05, 1000) 
-t_NUTS = @elapsed chain = sample(marginal_occupancy(Y), sampler, n_chain, drop_warmup=false)
-NUTS_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain[chain.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain[:log_density]))
+t_NUTS = @elapsed chain_NUTS = sample(marginal_occupancy(Y), sampler, n_chain, drop_warmup=false)
+NUTS_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain_NUTS[chain_NUTS.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain_NUTS[:log_density]))
 NUTS_times = range(0.0, t_NUTS, length=length(NUTS_log_predictive_trace))
+
+plot_chain(chain_NUTS, burnin=1)
+
+sampler = Gibbs(HMC(0.01,200,:αβ), PG(2, :z)) 
+t_Gibbs = @elapsed chain_Gibbs = sample(occupancy(Y), sampler, 10000)
+Gibbs_log_predictive_trace = cumsum([logmarginal(Y,z_known,ab,W=W,X=X) for ab in eachrow(chain_Gibbs[chain_Gibbs.name_map[1]].value.data[:,:,1])]) ./ (1:length(chain_Gibbs[:log_density]))
+plot_chain(chain_Gibbs, burnin=2000)
+
+
+# sampler = PG(20) 
+# x = ones(10)#randn(10)
+# t_PG = @elapsed chain_PG = sample(gdemo(x), sampler, 100)
+# sampler = NUTS()
+# t_PG = @elapsed chain_NUTS = sample(gdemo(x), sampler, 100)
+
+# fig = Figure()
+# ax = Axis(fig[1,1])
+# hist!(ax, chain_PG[:m].data[:])
+# hist!(ax, chain_NUTS[:m].data[:])
+# fig
 
 # compare VI trajectories
 ϕ0 = randn(20+n)
