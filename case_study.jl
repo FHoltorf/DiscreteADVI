@@ -46,7 +46,7 @@ for spec in specs
     save("../figures/case_study_marginals_$(spec).pdf",fig)
 
     fig = PAO_plot(ϕ_opt, chain, z_known=z_known)
-    save("../figures/PAO_dist_$(spec).pdf")
+    save("../figures/PAO_dist_$(spec).pdf",fig)
     
     save("results/case_study_$(spec).jld2", "phi_opt", ϕ_opt, 
                                     "phi_trace", ϕ_trace,
