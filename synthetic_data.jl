@@ -3,7 +3,7 @@ include("utils.jl") # optimization routines
 include("visualizations.jl") # plotting routines
 
 # number of sites
-n_range = [50]#, 100]
+n_range = [50, 100]
 for n in n_range
     # number of visits per site
     K = [4 for i in 1:n]
@@ -34,14 +34,13 @@ for n in n_range
     NUTS_times = range(0.0, t_NUTS, length=length(NUTS_log_predictive_trace))
     plot_chain(chain_NUTS, burnin=25000)
 
-    #=
     sampler = Gibbs(HMC(0.05,1000,:αβ), PG(2, :z)) 
-    t_Gibbs = @elapsed chain_Gibbs = sample(occupancy(Y), sampler, 20000, init_theta = vcat(zeros(4), ones(n-sum(z_known))))
+    t_Gibbs = @elapsed chain_Gibbs = sample(occupancy(Y), sampler, 10000, init_theta = vcat(zeros(4), ones(n-sum(z_known))))
     Gibbs_loglikelihood = [loglikelihood(Y,pars[5:end],pars[1:4],W=W,X=X) for pars in eachrow(chain_Gibbs[chain_Gibbs.name_map[1]].value.data[:,:,1])]
     Gibbs_log_predictive_trace = cumsum(Gibbs_loglikelihood) ./ (1:length(Gibbs_loglikelihood))
     Gibbs_times = range(0.0, t_Gibbs, length=length(Gibbs_log_predictive_trace))
     plot_chain(chain_Gibbs, burnin=5000)
-    =#
+
     # compare VI trajectories
     ϕ0 = randn(20+n-sum(z_known))
     struct OptResults
@@ -71,7 +70,7 @@ for n in n_range
                         ylabel = "log predictive posterior",
                         xticks = LogTicks(IntegerTicks()),
                         xscale = log10)
-    ylims!(ax, -80, -30)
+    #ylims!(ax, -80, -30)
     lines!(ax, NUTS_times[2:end], NUTS_log_predictive_trace[2:end], color = :black, linewidth = 2, label = "NUTS + marginalization")
     lines!(ax, Gibbs_times[2:end], Gibbs_log_predictive_trace[2:end], color = :orange, linewidth = 2, label = "Gibbs(HMC, PG)")
     lines!(ax, res1.times[2:end], res1.log_predictive_trace, color = :red, linewidth=2, label = "VI (m=1)")
