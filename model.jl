@@ -131,15 +131,7 @@ end
     
     @views α = αβ[1:2]
     @views β = αβ[3:4]
-    #=
-    z = fill(undef, length(Y))
-    for i in eachindex(X)
-        z[i] ~ Bernoulli(ψ(X[i],β))
-        for j in eachindex(W[i])
-            Y[i][j] ~  Bernoulli(z[i]*d(W[i][j],α))
-        end
-    end
-    =#
+    
     z = fill(undef, length(z_known) - sum(z_known))
     k = 1
     for i in eachindex(X)
@@ -157,9 +149,3 @@ end
         end
     end
 end    
-
-function gibbs_sampler()
-    # draw latent
-
-    # draw alpha, beta
-end
