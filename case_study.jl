@@ -48,7 +48,7 @@ for spec in specs
     fig = PAO_plot(ϕ_opt, chain, z_known=z_known)
     save("../figures/PAO_dist_$(spec).pdf")
     
-    save("results/case_study.jld2", "phi_opt", ϕ_opt, 
+    save("results/case_study_$(spec).jld2", "phi_opt", ϕ_opt, 
                                     "phi_trace", ϕ_trace,
                                     "times", times, 
                                     "elbo_trace", elbo_trace,
