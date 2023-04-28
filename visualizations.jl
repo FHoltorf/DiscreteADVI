@@ -1,4 +1,4 @@
-using CairoMakie
+using CairoMakie, LinearAlgebra
 
 struct IntegerTicks end
 
@@ -174,6 +174,49 @@ function marginals(chain, ϕ; burnin = 1000, width = 4, opacity=0.1)
     
     fig
 end
+
+function PAO_plot(ϕ_opt, chain; z_known=z_known)
+    unknown = filter(i -> !z_known[i], 1:n)
+    μ = ϕ_opt[1:4]
+    V = reshape(ϕ_opt[5:20], 4, 4)
+    αβ_post = MvNormal(μ, Hermitian(V*V'+0.01*I))
+    n_samples = 100000
+    NO = zeros(Int,n-sum(z_known)+1)
+    for _ in 1:n_samples
+        αβ = rand(αβ_post)
+        @views α, β = αβ[1:2], αβ[3:4]
+        pys = [prod(d(W[i][j], α) for j in eachindex(W[i])) for i in unknown]
+        ps = [ψ(X[i],β)*pys[k]/(1+pys[k]) for (k,i) in enumerate(unknown)]
+        val = sum(rand(Bernoulli(p)) for p in ps)
+        NO[val+1] +=1
+    end
+
+    NO_chain = zeros(Int, n - sum(z_known) + 1)
+    for αβ in eachrow(chain.value[25000:end,:,1])
+        α, β = Vector(αβ[1:2]), Vector(αβ[3:4])
+        pys = [prod(d(W[i][j], α) for j in eachindex(W[i])) for i in unknown]
+        ps = [ψ(X[i],β)*pys[k]/(1+pys[k]) for (k,i) in enumerate(unknown)]
+        val = sum(rand(Bernoulli(p)) for p in ps)
+        NO_chain[val+1] += 1
+    end
+    NO_chain_dist = (NO_chain)./sum(NO_chain)
+    NO_dist = (NO)./sum(NO)
+    fig = Figure(fontsize=28)
+    ax = Axis(fig[1,1], xlabel = "number of occupied sites", 
+                        ylabel = "posterior predictive probability mass",
+                        xminorgridvisible=false,
+                        xgridvisible=false,
+                        yminorgridvisible=false,
+                        ygridvisible=false)
+    barplot!(ax, collect(sum(z_known):n) .- 1/4, NO_chain_dist, width=1/2, color = :black, label = "HMC")
+    barplot!(ax, collect(sum(z_known):n) .+ 1/4, NO_dist, width=1/2, 
+                color = :lightgray, strokecolor = :black, strokewidth=1, label = "VI")
+    text!(ax, Point2(100, 0.2), text="TV-distance = $(round(50*norm(NO_chain_dist-NO_dist, 1), digits=1))%",
+                                fontsize=28, )
+    axislegend(position = :rt)
+    fig
+end
+
 
 # plot convergence
 #=

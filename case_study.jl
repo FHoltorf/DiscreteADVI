@@ -2,7 +2,7 @@ include("model_reduced.jl")
 include("visualizations.jl")
 include("utils.jl")
 
-using RData, DataFrames, Dates, CategoricalArrays
+using RData, DataFrames, Dates, CategoricalArrays, FileIO
 
 specs = [1,2,3,4,5]
 for spec in specs
@@ -35,13 +35,24 @@ for spec in specs
 
     n_chain = 100000
     sampler = NUTS() #1000, 0.65)
-    chain = sample(marginal_occupancy(Y), sampler, n_chain, drop_warmup=true)
+    t_MCMC = @elapsed chain = sample(marginal_occupancy(Y), sampler, n_chain, drop_warmup=true)
 
     ϕ0 = randn(20+n-sum(z_known))
-    ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(ϕ0, 5, 500, 0.05, n_snapshots=10000, n_estimator = 1000)
+    ϕ_opt, ϕ_trace, times, elbo_trace, log_predictive_trace = optimize_elbo(ϕ0, 5, 500, 0.05, n_snapshots=10, n_estimator = 1000)
     fig = pairplot(chain, ϕ_opt, [], burnin=25000, thinning = 100)
     save("../figures/case_study_$(spec).pdf",fig)
 
     fig = marginals(chain, ϕ_opt, burnin=25000, opacity=0.0)
     save("../figures/case_study_marginals_$(spec).pdf",fig)
+
+    fig = PAO_plot(ϕ_opt, chain, z_known=z_known)
+    save("../figures/PAO_dist_$(spec).pdf")
+    
+    save("results/case_study.jld2", "phi_opt", ϕ_opt, 
+                                    "phi_trace", ϕ_trace,
+                                    "times", times, 
+                                    "elbo_trace", elbo_trace,
+                                    "log_predictive_trace", log_predictive_trace,
+                                    "chain", chain,
+                                    "t_MCMC", t_MCMC)
 end
