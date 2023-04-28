@@ -211,8 +211,8 @@ function PAO_plot(ϕ_opt, chain; z_known=z_known)
     barplot!(ax, collect(sum(z_known):n) .- 1/4, NO_chain_dist, width=1/2, color = :black, label = "HMC")
     barplot!(ax, collect(sum(z_known):n) .+ 1/4, NO_dist, width=1/2, 
                 color = :lightgray, strokecolor = :black, strokewidth=1, label = "VI")
-    text!(ax, Point2(100, 0.2), text="TV-distance = $(round(50*norm(NO_chain_dist-NO_dist, 1), digits=1))%",
-                                fontsize=28, )
+    text!(ax, Point2(0.4, 0.875), space = :relative, text="TV-distance = $(round(50*norm(NO_chain_dist-NO_dist, 1), digits=1))%",
+                                fontsize=28)
     axislegend(position = :rt)
     fig
 end
