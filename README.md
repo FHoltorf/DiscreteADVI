@@ -17,5 +17,7 @@ Throughout the repository the bird species are numbered 1-5. The assignment is a
 
 
 [1] Kucukelbir, Alp, et al. "Automatic variational inference in Stan." Advances in neural information processing systems 28 (2015).
+
 [2] MacKenzie, Darryl I., et al. "Estimating site occupancy rates when detection probabilities are less than one." Ecology 83.8 (2002): 2248-2255.
+
 [2] Clark, Allan E., Res Altwegg, and John T. Ormerod. "A variational Bayes approach to the analysis of occupancy models." PloS one 11.2 (2016): e0148966.
