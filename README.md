@@ -9,10 +9,15 @@ spatial territories in southern Africa by 5 different bird species. The aim is t
 proportion of occupied sites as well as the statistics of logistic regression coefficients relating the detection and occupancy probability to known covariates.
 
 Throughout the repository the bird species are numbered 1-5. The assignment is as follows:
+
 1 - Black-headed heron
+
 2 - Egyptian goose
+
 3 - Longclaw
+
 4 - Sparrow-Weave 
+
 5 - Widowbird
 
 
